@@ -13,42 +13,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model Profile {
-  id        String  @id @unique
-  fullName String
-  address1 String
-  address2 String?
-  city     String
-  state    String
-  zipcode  String
-}
+  id         Int      @id @default(autoincrement())
+  uuid       String   @unique
+  userId     String   @unique // Link to Supabase Auth user ID
+  fullName   String
+  address1   String
+  address2   String?
+  city       String
+  state      String?
+  zipcode    String
 
-// model to store states
-model State {
-  id    String @id @unique
-  label String
-  value String
-}
-
-model Quote {
-  id              String   @id @unique 
-  gallonsRequested Float
-  deliveryAddress String
-  deliveryDate    DateTime
-  suggestedPrice  Float?
-  totalAmountDue  Float?
+  // Relation fields
+  quotes     Quote[]
+  histories  QuoteHistory[]
 }
 
 model QuoteHistory {
-  id              String   @id @unique 
-  date            DateTime
+  id               Int      @id @default(autoincrement())
+  date             DateTime
   gallonsRequested Float
-  pricePerGallon  Float
-  totalDue        Float
-  deliveryAddress String
-  deliveryDate    DateTime
+  pricePerGallon   Float
+  totalDue         Float
+  deliveryAddress  String
+  deliveryDate     DateTime
+  profileId        Int
+
+  // Relation fields
+  profile          Profile  @relation(fields: [profileId], references: [id])
 }
 
+model Quote {
+  id               Int      @id @default(autoincrement())
+  gallonsRequested Float
+  deliveryAddress  String?
+  deliveryDate     DateTime
+  suggestedPrice   Float?
+  totalAmountDue   Float?
+  profileId        Int
 
-
+  // Relation fields
+  profile          Profile  @relation(fields: [profileId], references: [id])
+}

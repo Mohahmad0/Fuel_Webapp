@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'; 
 import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { createClient } from '@/utils/supabase/client'; // Import Supabase client
 
 // Form Schema 
 const formSchema = z.object({
@@ -16,7 +16,7 @@ const formSchema = z.object({
     address1: z.string().min(1, { message: "Address 1 is required" }).max(100),
     address2: z.string().max(100).optional(),
     city: z.string().min(1, { message: "City is required" }).max(100),
-    state: z.string().length(2, { message: "Please Select a State" }),
+    //state: z.string().length(2, { message: "Please Select a State" }),
     zipcode: z.string().min(5, { message: "Zipcode must be 5 digits" }).max(5, { message: "Zipcode must be 5 digits" })
 });
 
@@ -83,9 +83,41 @@ export default function Profile() {
         }
     });
 
-    const handleSubmit = (data: z.infer<typeof formSchema>) => {
-        console.log(data); // Send data for saving to the database 
-    }
+    const supabase = createClient(); // Initialize Supabase client
+
+    const handleSubmit = async (data: z.infer<typeof formSchema>) => {
+         console.log('Form data:', data); // Log the form data
+        const supabase = createClient(); // Initialize Supabase client
+        try {
+            // Get the current user
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error) throw error;
+
+            // Send data for saving to the database 
+            const response = await fetch('api/profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...data,
+                    userId: user?.id, // Include the userId in the request body
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update profile');
+            }
+
+            console.log('Profile updated successfully');
+            window.location.href = '/quote';
+            // Redirect or perform any additional action after successful update
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            // Handle error
+        }
+    };
+
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-between p-24">
@@ -162,10 +194,10 @@ export default function Profile() {
                             }}
                         />
     
-                        <FormItem>  
+                        {/* <FormItem>  
                             <FormLabel>State</FormLabel>
                             <FormControl>
-                                <Select {...form.register("state")} defaultValue="" >
+                                <Select {...form.register("state")} defaultValue="">
                                     <SelectTrigger className="w-[180px]">
                                         <SelectValue placeholder="Select a State" />
                                     </SelectTrigger>
@@ -182,7 +214,7 @@ export default function Profile() {
                                 </Select>
                             </FormControl>
                             <FormMessage/>
-                        </FormItem>
+                        </FormItem> */}
 
 
                         <FormField control={form.control} //Zipcode
