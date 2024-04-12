@@ -53,7 +53,7 @@ const Navbar: React.FC<NavbarProps> = () => {
                         <Link legacyBehavior href="/login">
                             <a className="text-white hover:text-gray-300">Login</a>
                         </Link>
-                        <Link legacyBehavior href="/register">
+                        <Link legacyBehavior href="/registration">
                             <a className="text-white hover:text-gray-300">Sign up</a>
                         </Link>
                     </>

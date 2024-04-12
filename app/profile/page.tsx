@@ -6,9 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'; // You'll likely need a Select component
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'; 
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
-// Form Schema (with validation)
+// Form Schema 
 const formSchema = z.object({
     fullName: z.string().min(1, { message: "Full Name is required" }).max(50),
     address1: z.string().min(1, { message: "Address 1 is required" }).max(100),

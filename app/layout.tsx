@@ -5,6 +5,7 @@ import Head from "next/head";
 
 //Homepage layout
 
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <Head> 
+      <Head>
         <link rel="icon" href="/favicon.ico" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
@@ -28,4 +29,3 @@ export default function RootLayout({
     </html>
   );
 }
-
