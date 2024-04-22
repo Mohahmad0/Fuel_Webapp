@@ -9,15 +9,25 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'; 
 import { PrismaClient } from '@prisma/client';
 import { createClient } from '@/utils/supabase/client'; // Import Supabase client
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card"
+import { useEffect, useState } from 'react';
+
 
 // Form Schema 
 const formSchema = z.object({
-    fullName: z.string().min(1, { message: "Full Name is required" }).max(50),
+    fullName: z.string().regex(/^[a-zA-Z\s]+$/, { message: "Full Name must contain only letters and spaces" }).min(1, { message: "Full Name is required" }).max(50, { message: "Full Name must not exceed 50 characters" }),   
     address1: z.string().min(1, { message: "Address 1 is required" }).max(100),
     address2: z.string().max(100).optional(),
-    city: z.string().min(1, { message: "City is required" }).max(100),
-    //state: z.string().length(2, { message: "Please Select a State" }),
-    zipcode: z.string().min(5, { message: "Zipcode must be 5 digits" }).max(5, { message: "Zipcode must be 5 digits" })
+    city: z.string().regex(/^[a-zA-Z\s]+$/, { message: "City must contain only letters " }).min(1, { message: "City is required" }).max(100),
+    state: z.string().min(2, { message: "Please Select a State" }),
+    zipcode: z.string().regex(/^\d+$/, "Zipcode must contain only digits").min(5, { message: "Zipcode must be at least 5 digits" }).max(9, { message: "Zipcode must be no more than 9 digits" })
 });
 
 // Define your states
@@ -74,26 +84,75 @@ const states = [
     { label: "Wyoming", value: "WY" },
 ];
 
+interface Profile {
+    fullName: string;
+    address1: string;
+    address2?: string;  // Optional as it might not always be present
+    city: string;
+    state: string;
+    zipcode: string;
+}
+
+
 
 export default function Profile() {
+    const [profile, setProfile] = useState<Profile | undefined>(undefined);
+    
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
-            // Load initial values from DB as needed 
-        }
     });
 
     const supabase = createClient(); // Initialize Supabase client
 
+    useEffect(() => {
+        async function fetchProfile() {
+            const supabase = createClient();
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                if (error) throw error;
+
+                // Add a null check for the user object
+                if (!user) {
+                    console.error('User not found');
+                    return;
+                }
+
+                const response = await fetch(`api/profile?userId=${user?.id}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch profile');
+                }
+
+                const fetchedProfile = await response.json();
+                setProfile(fetchedProfile);
+            } catch (error) {
+                console.error('Error fetching profile:', error);
+            }
+        }
+
+        fetchProfile();
+    }, []);
+
+
+
+
+
+
+
     const handleSubmit = async (data: z.infer<typeof formSchema>) => {
-         console.log('Form data:', data); // Log the form data
-        const supabase = createClient(); // Initialize Supabase client
+        console.log('Form data:', data);
+        const supabase = createClient();
+        
         try {
-            // Get the current user
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
 
-            // Send data for saving to the database 
             const response = await fetch('api/profile', {
                 method: 'POST',
                 headers: {
@@ -101,7 +160,7 @@ export default function Profile() {
                 },
                 body: JSON.stringify({
                     ...data,
-                    userId: user?.id, // Include the userId in the request body
+                    userId: user?.id,
                 }),
             });
 
@@ -109,18 +168,20 @@ export default function Profile() {
                 throw new Error('Failed to update profile');
             }
 
+            const updatedProfile = await response.json(); // Get the updated profile data from the response
+            setProfile(updatedProfile); // Update the profile state
+
             console.log('Profile updated successfully');
-            window.location.href = '/quote';
-            // Redirect or perform any additional action after successful update
+            window.location.href = '/quote'; // Redirect or other actions after update
         } catch (error) {
             console.error('Error updating profile:', error);
-            // Handle error
         }
     };
 
 
+
     return (
-        <main className="flex min-h-screen flex-col items-center justify-between p-24">
+        <main className="flex min-h-screen flex-row items-center justify-between p-24">
             <div className="max-w-md w-full">
                 <h1 className="text-3xl font-bold mb-4">Edit Profile</h1>
 
@@ -194,27 +255,39 @@ export default function Profile() {
                             }}
                         />
     
-                        {/* <FormItem>  
+
+                        <FormItem>
                             <FormLabel>State</FormLabel>
                             <FormControl>
-                                <Select {...form.register("state")} defaultValue="">
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue placeholder="Select a State" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectGroup>
-                                            <SelectLabel>States</SelectLabel>
-                                            {states.map((state) => (
-                                                <SelectItem key={state.value} value={state.value}>
-                                                    {state.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </SelectContent>
-                                </Select>
+                                <select
+                                    {...form.register("state")}
+                                    defaultValue=""
+                                    style={{
+                                        width: '100%', // Full width
+                                        padding: '8px 12px', // Some padding
+                                        border: '1px solid #ccc', // Gray border
+                                        borderRadius: '4px', // Rounded borders
+                                        boxSizing: 'border-box', // Box sizing
+                                        appearance: 'none', // Remove default styling
+                                        backgroundColor: 'white', // White background
+                                        cursor: 'pointer', // Pointer cursor on hover
+                                    }}
+                                >
+                                    <option value="" disabled>Select a State</option>
+                                    {states.map((state) => (
+                                        <option key={state.value} value={state.value}>
+                                            {state.label}
+                                        </option>
+                                    ))}
+                                </select>
                             </FormControl>
-                            <FormMessage/>
-                        </FormItem> */}
+                            <FormMessage>{form.formState.errors.state?.message}</FormMessage>
+                        </FormItem>
+
+
+
+
+
 
 
                         <FormField control={form.control} //Zipcode
@@ -240,6 +313,24 @@ export default function Profile() {
                     </form>
                 </Form>
             </div>
+            <Card className="flex flex-col justify-between p-6 ml-auto flex-h-screen">
+                <CardHeader>
+                    <CardTitle className="text-3xl font-bold">Current Profile Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {profile ? (
+                        <>
+                            <div className="text-lg font-semibold p-2">Full Name: {profile.fullName}</div>
+                            <div className="text-lg font-semibold p-2">Address: {profile.address1} {profile.address2}</div>
+                            <div className="text-lg font-semibold p-2">City: {profile.city}</div>
+                            <div className="text-lg font-semibold p-2">State: {profile.state}</div>
+                            <div className="text-lg font-semibold p-2">Zip Code: {profile.zipcode}</div>
+                        </>
+                    ) : (
+                        <div>No profile found.</div>
+                    )}
+                </CardContent>
+            </Card>
         </main>
     );
 }
