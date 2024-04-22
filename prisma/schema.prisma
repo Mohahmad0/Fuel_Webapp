@@ -15,8 +15,7 @@ datasource db {
 
 model Profile {
   id         Int      @id @default(autoincrement())
-  uuid       String   @unique
-  userId     String   @unique // Link to Supabase Auth user ID
+  userId     String   @unique
   fullName   String
   address1   String
   address2   String?
@@ -37,10 +36,10 @@ model QuoteHistory {
   totalDue         Float
   deliveryAddress  String
   deliveryDate     DateTime
-  profileId        Int
+  userId           String
 
   // Relation fields
-  profile          Profile  @relation(fields: [profileId], references: [id])
+  profile          Profile  @relation(fields: [userId], references: [userId])
 }
 
 model Quote {
@@ -50,8 +49,8 @@ model Quote {
   deliveryDate     DateTime
   suggestedPrice   Float?
   totalAmountDue   Float?
-  profileId        Int
+  userId           String
 
   // Relation fields
-  profile          Profile  @relation(fields: [profileId], references: [id])
+  profile          Profile  @relation(fields: [userId], references: [userId])
 }
