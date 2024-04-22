@@ -18,6 +18,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client'; // Assuming Supabase is used for user management and data storage
+import { User } from '@supabase/supabase-js';
+
 
 
 // Form schema
@@ -28,64 +30,51 @@ const formSchema = z.object({
 
 export default function FuelQuote() {
     const [loading, setLoading] = useState(false);
-    const [deliveryAddress, setDeliveryAddress] = useState("123 Main St, Anytown, USA");
+    const [deliveryAddress, setDeliveryAddress] = useState("");
     const [deliveryDate, setDeliveryDate] = useState<Date | string>("");
     const [gallonsRequested, setGallonsRequested] = useState<number | string>("");
+    const [suggestedPrice, setSuggestedPrice] = useState<number | string>("");
+    const [totalAmountDue, setTotalAmountDue] = useState<number | string>("");
+    const [quoteRetrieved, setQuoteRetrieved] = useState(false);  // New state variable
     const supabase = createClient();
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
     });
 
-
-    useEffect(() => {
-        // Here, you could fetch the actual address and update it
-        // For now, the placeholder remains unless fetched data updates it
-        const fetchDeliveryAddress = async () => {
-            const { data, error } = await supabase.from('profile').select('address1, address2').single();
-            if (error) {
-                console.error('Error fetching delivery address:', error);
-                return;
-            }
-            if (data && data.address1) {
-                const fullAddress = `${data.address1}, ${data.address2 || ''}`.trim();
-                setDeliveryAddress(fullAddress);
-            } else {
-                console.error('No address data found');
-            }
-        };
-
-        fetchDeliveryAddress();
-    }, []);
-
     const handleSubmit = async (data: any) => {
         setLoading(true);
         try {
-            const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-            if (sessionError) throw sessionError;
-            if (!user) throw new Error('No user logged in');
+            const { data: authResponse, error } = await supabase.auth.getUser();
+            if (error || !authResponse) {
+                console.error('Authentication error or no user:', error);
+                setLoading(false);
+                return;
+            }
 
-            const postData = {
-                profileId: user.id,  // Assuming the profile ID can be derived like this
-                gallonsRequested: data.gallonsRequested,
-                deliveryDate: data.deliveryDate.toISOString().substring(0, 10),
-                deliveryAddress,
-            };
+            const user: User = authResponse.user;
 
-            console.log('Sending POST data to /api/quote:', postData);
             const response = await fetch('/api/quote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(postData),
+                body: JSON.stringify({
+                    userId: user.id,
+                    gallonsRequested: data.gallonsRequested,
+                    deliveryDate: data.deliveryDate,
+                }),
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                console.error('POST request failed:', errorData);
                 throw new Error('Failed to create quote');
             }
 
-            const quoteResponse = await response.json();
-            console.log('Quote created successfully:', quoteResponse);
+            const quoteData = await response.json();
+            // Set all fields to reflect all the data from the response
+            setGallonsRequested(quoteData.gallonsRequested);
+            setDeliveryDate(quoteData.deliveryDate);
+            setDeliveryAddress(quoteData.deliveryAddress);
+            setSuggestedPrice(quoteData.suggestedPrice);
+            setTotalAmountDue(quoteData.totalAmountDue);
+            window.location.href = '/quotehistory';
         } catch (error) {
             console.error('Error requesting quote:', error);
         } finally {
@@ -94,7 +83,48 @@ export default function FuelQuote() {
     };
 
 
+    const handleGetQuote = async () => {
+        if (!form.getValues().gallonsRequested || !form.getValues().deliveryDate) {
+            return;
+        }
+        setLoading(true);
+        try {
+            const { data: authResponse, error } = await supabase.auth.getUser();
+            if (error || !authResponse) {
+                console.error('Authentication error or no user:', error);
+                setLoading(false);
+                return;
+            }
+            const user: User = authResponse.user;
+            const response = await fetch('/api/quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    gallonsRequested: form.getValues().gallonsRequested,
+                    deliveryDate: form.getValues().deliveryDate,
+                    getQuoteOnly: true,
+                }),
+            });
 
+            if (!response.ok) {
+                throw new Error('Failed to get quote');
+            }
+
+            const quoteData = await response.json();
+            setGallonsRequested(form.getValues().gallonsRequested);
+            setDeliveryDate(form.getValues().deliveryDate);
+            setDeliveryAddress(quoteData.deliveryAddress);
+            setSuggestedPrice(quoteData.suggestedPrice);
+            setTotalAmountDue(quoteData.totalAmountDue);
+            setQuoteRetrieved(true);  // Set to true once quote is retrieved
+            
+        } catch (error) {
+            console.error('Error getting quote:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <main className="flex min-h-0 flex-row items-left justify-between p-24">
@@ -102,8 +132,6 @@ export default function FuelQuote() {
                 <h1 className="text-3xl font-bold mb-4">Request a Fuel Quote</h1>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-6">
-
-
                         {/* Gallons requested */}
                         <FormField
                             control={form.control}
@@ -114,12 +142,14 @@ export default function FuelQuote() {
                                     <FormControl>
                                         <Input
                                             placeholder="Number of Gallons"
-                                            type="text" // Change type to text
+                                            type="number"
                                             {...field}
+                                            disabled={quoteRetrieved}
                                             value={field.value}
                                             onChange={(e) => {
                                                 const value = e.target.value.replace(/[^\d]/g, ''); // Remove non-numeric characters
                                                 field.onChange(value === '' ? undefined : parseInt(value)); // Parse numeric value or undefined
+                                            
                                             }}
                                         />
                                     </FormControl>
@@ -127,8 +157,7 @@ export default function FuelQuote() {
                                 </FormItem>
                             )}
                         />
-
-
+                        {/* Delivery date */}
                         <FormField
                             control={form.control}
                             name="deliveryDate"
@@ -140,6 +169,7 @@ export default function FuelQuote() {
                                             placeholder="Date"
                                             type="date"
                                             {...field}
+                                            disabled={quoteRetrieved}
                                             value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
                                             onChange={(e) => {
                                                 const value = e.target.value;
@@ -152,26 +182,31 @@ export default function FuelQuote() {
                                 </FormItem>
                             )}
                         />
+                        {/* Get Quote button */}
+                        <Button
+                            type="button"
+                            onClick={handleGetQuote}
+                            disabled={loading || !form.watch('gallonsRequested') || !form.watch('deliveryDate') || quoteRetrieved}>
+                            Get Quote
+                        </Button>
 
-
-                        <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Requesting Quote...' : 'Request Quote'}
+                        <Button type="submit" disabled={loading || !suggestedPrice || !totalAmountDue}>
+                            Submit Quote
                         </Button>
                     </form>
                 </Form>
             </div>
-
+            {/* Quote details */}
             <Card className="flex flex-col justify-between p-6 ml-auto flex-h-screen">
                 <CardHeader>
                     <CardTitle className="text-3xl font-bold">Calculated Fuel Quote</CardTitle>
                 </CardHeader>
-
                 <CardContent>
                     <div className="text-lg font-semibold p-2">Delivery Address: {deliveryAddress}</div>
                     <div className="text-lg font-semibold p-2">Delivery Date: {typeof deliveryDate === 'object' ? deliveryDate.toISOString().split('T')[0] : deliveryDate}</div>
                     <div className="text-lg font-semibold p-2">Gallons requested: {gallonsRequested}</div>
-                    <div className="text-lg font-semibold p-2 ">Price per Gallon: ${2.52}</div>
-                    <div className="text-2xl font-bold mt-2">Total Amount Due: ${500}</div>
+                    <div className="text-lg font-semibold p-2 ">Price per Gallon: ${suggestedPrice}</div>
+                    <div className="text-2xl font-bold mt-2">Total Amount Due: ${totalAmountDue}</div>
                 </CardContent>
 
             </Card>
